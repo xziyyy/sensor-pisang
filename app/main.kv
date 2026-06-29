@@ -1,0 +1,19 @@
+<CameraWidget>:
+    orientation: 'vertical'
+    MDTopAppBar:
+        title: 'Deteksi Kematangan'
+        left_action_items: [['camera', lambda x: None]]
+    Image:
+        id: cam_preview
+        allow_stretch: True
+        keep_ratio: True
+    MDLabel:
+        text: root.status_text
+        halign: 'center'
+        theme_text_color: 'Custom'
+        text_color: 1, 1, 1, 1
+        font_style: 'H5'
+
+BoxLayout:
+    CameraWidget:
+        id: camera_widget
