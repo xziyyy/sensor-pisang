@@ -37,5 +37,3 @@ Membangun APK (ringkasan):
 Catatan teknis & tradeoffs:
 - Mengonversi model Keras ke TFLite memberi performa on-device yang baik.
 - Jika Anda ingin memakai ekstraksi fitur klasik (`ekstraksi_ciri.py` + scikit-learn), porting ke Android memerlukan bundling OpenCV native dan scikit-learn yang lebih sulit.
-
-Jika Anda ingin saya: 1) siapkan notebook Colab untuk build APK, atau 2) buat UI Kivy lebih lengkap (KivyMD + assets), pilih opsi selanjutnya.
