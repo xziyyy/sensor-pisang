@@ -224,6 +224,12 @@ def main():
     if "antrian_hasil" not in st.session_state:
         st.session_state.antrian_hasil = queue.Queue(maxsize=1)
 
+    # Ambil ke variabel biasa dulu. video_processor_factory dipanggil dari
+    # thread lain milik streamlit-webrtc (bukan thread utama Streamlit),
+    # dan st.session_state tidak bisa diakses dari thread itu -> harus
+    # sudah berupa objek Python biasa sebelum masuk ke closure/lambda.
+    antrian_hasil = st.session_state.antrian_hasil
+
     kolom_video, kolom_panel = st.columns([3, 2])
 
     with kolom_video:
@@ -232,14 +238,14 @@ def main():
             mode=WebRtcMode.SENDRECV,
             rtc_configuration=RTC_CONFIGURATION,
             video_processor_factory=lambda: ProsesorVideo(
-                model, st.session_state.antrian_hasil
+                model, antrian_hasil
             ),
             media_stream_constraints={"video": True, "audio": False},
             async_processing=True,
         )
 
     with kolom_panel:
-        tampilkan_panel_status(st.session_state.antrian_hasil, ctx.state.playing)
+        tampilkan_panel_status(antrian_hasil, ctx.state.playing)
         tampilkan_panel_referensi(database)
 
     st.markdown(
