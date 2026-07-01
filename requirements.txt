@@ -6,4 +6,3 @@ joblib
 scikit-learn
 scikit-image
 numpy
-pandas

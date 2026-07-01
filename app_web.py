@@ -1,17 +1,20 @@
 """
 Deteksi kematangan pisang, realtime lewat browser (bukan jepret foto satu-satu).
 
-Perbedaan dari versi camera_input sebelumnya:
+Fitur:
 - Pakai streamlit-webrtc supaya kamera menyala terus dan tiap frame video
   langsung diproses & dikasih label, mirip versi desktop (deteksi_kamera.py),
   tapi kameranya tetap kamera milik orang yang buka halaman ini (termasuk HP),
   bukan kamera server.
+- Video dibalik (cv2.flip) supaya tidak mirror/kaca (kiri-kanan tidak terbalik).
+- Kotak pembatas (bounding box) digambar di sekeliling pisang yang terdeteksi.
+- Klasifikasi hanya jalan kalau ada objek yang tersegmentasi dari background;
+  kalau tidak ada, ditampilkan status "Tidak ada pisang terdeteksi".
 - Ada smoothing (voting mayoritas beberapa frame terakhir) supaya label
   tidak berkedip-kedip ganti tiap frame hanya karena noise sesaat.
-- Ada panel referensi kematangan, diambil dari database_pisang.csv (hasil
-  rangkuman dari struktur dataset di folder train/: mentah, mateng,
-  kematengan, busuk), supaya orang yang belum familiar bisa paham arti
-  tiap label yang muncul di video.
+- Panel referensi tingkat kematangan di sebelah video, berdasarkan skala
+  Von Loesecke (skala kematangan pisang 7 tahap yang jadi rujukan umum di
+  riset & industri pisang), dipetakan ke 4 kategori dataset training.
 
 Model (model_pisang.pkl) dan ekstraksi_ciri.py tidak diubah sama sekali.
 
@@ -28,32 +31,43 @@ import av
 import cv2
 import joblib
 import numpy as np
-import pandas as pd
 import streamlit as st
 from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
 
 from ekstraksi_ciri import ambil_ciri, segmentasi_pisang
 
 FILE_MODEL = "model_pisang.pkl"
-FILE_DATABASE = "database_pisang.csv"
 JUMLAH_FRAME_SMOOTHING = 10
 UKURAN_ANALISIS = (200, 200)  # harus sama dengan resize di dalam ambil_ciri()
 
 
-def ada_objek_di_frame(gambar_bgr):
+def deteksi_area_pisang(gambar_bgr):
     """
     Pakai ulang segmentasi_pisang() dari ekstraksi_ciri.py untuk mengecek
-    apakah ada objek yang cukup besar tersegmentasi dari background.
+    apakah ada objek yang cukup besar tersegmentasi dari background, dan
+    sekaligus menghitung kotak pembatas (bounding box) di sekeliling objek
+    itu supaya bisa digambar di video.
 
     segmentasi_pisang() mengembalikan mask putih PENUH (semua piksel 255)
     kalau tidak ada kontur yang ditemukan, atau kontur yang ada terlalu
     kecil (< 5% dari luas frame) -> itu tandanya "tidak ada objek layak".
-    Kalau ada objek yang tersegmentasi, mask-nya hanya mengisi area
-    kontur tersebut, bukan seluruh frame.
+
+    Mengembalikan (ada_objek, kotak) dengan kotak berupa (x, y, w, h)
+    dalam koordinat frame ASLI (bukan koordinat gambar yang sudah di-resize
+    untuk analisis), atau None kalau tidak ada objek.
     """
+    tinggi_asli, lebar_asli = gambar_bgr.shape[:2]
     gambar_kecil = cv2.resize(gambar_bgr, UKURAN_ANALISIS)
     mask = segmentasi_pisang(gambar_kecil)
-    return cv2.countNonZero(mask) < mask.size
+
+    if cv2.countNonZero(mask) >= mask.size:
+        return False, None
+
+    x, y, w, h = cv2.boundingRect(mask)
+    skala_x = lebar_asli / UKURAN_ANALISIS[0]
+    skala_y = tinggi_asli / UKURAN_ANALISIS[1]
+    kotak = (int(x * skala_x), int(y * skala_y), int(w * skala_x), int(h * skala_y))
+    return True, kotak
 
 NAMA_KELAS = {
     "mentah": "Mentah",
@@ -68,6 +82,37 @@ WARNA_BGR = {
     "kematengan": (43, 125, 236),
     "busuk": (60, 60, 200),
 }
+
+# Referensi tingkat kematangan, dipetakan dari skala Von Loesecke - skala
+# 7 tahap warna kulit pisang yang jadi rujukan umum di riset & industri
+# pisang sejak 1949, dan masih dipakai sampai sekarang untuk penyortiran
+# pisang secara visual. Dipetakan ke 4 kategori yang dipakai model ini.
+REFERENSI_KEMATANGAN = [
+    {
+        "kelas": "mentah",
+        "label": "Mentah",
+        "deskripsi": "Kulit hijau penuh, atau hijau dengan sedikit semburat kuning",
+        "warna_hex": "#569c4a",
+    },
+    {
+        "kelas": "mateng",
+        "label": "Matang",
+        "deskripsi": "Kulit kuning dengan ujung sedikit hijau, sampai kuning penuh",
+        "warna_hex": "#f4ad44",
+    },
+    {
+        "kelas": "kematengan",
+        "label": "Sangat Matang",
+        "deskripsi": "Kuning penuh dengan bintik-bintik coklat mulai muncul",
+        "warna_hex": "#ec7d2c",
+    },
+    {
+        "kelas": "busuk",
+        "label": "Terlalu Matang",
+        "deskripsi": "Bintik coklat meluas atau kulit sudah menghitam",
+        "warna_hex": "#c83c3c",
+    },
+]
 
 RTC_CONFIGURATION = RTCConfiguration(
     {
@@ -137,14 +182,6 @@ def muat_model():
     return joblib.load(FILE_MODEL)
 
 
-@st.cache_data
-def muat_database():
-    try:
-        return pd.read_csv(FILE_DATABASE)
-    except FileNotFoundError:
-        return None
-
-
 class ProsesorVideo:
     """
     Jalan di thread terpisah milik streamlit-webrtc. Tiap frame video masuk
@@ -162,9 +199,15 @@ class ProsesorVideo:
 
     def recv(self, frame):
         gambar = frame.to_ndarray(format="bgr24")
+        # Kamera depan/laptop biasanya dikirim browser dalam kondisi
+        # "kaca cermin" (kanan-kiri terbalik) untuk preview normal.
+        # Dibalik lagi di sini supaya gerakan di layar sesuai arah asli.
+        gambar = cv2.flip(gambar, 1)
         tinggi = gambar.shape[0]
 
-        if not ada_objek_di_frame(gambar):
+        ada_objek, kotak = deteksi_area_pisang(gambar)
+
+        if not ada_objek:
             self.riwayat.clear()
             cv2.rectangle(gambar, (0, tinggi - 70), (420, tinggi), (25, 25, 25), -1)
             cv2.putText(gambar, "Tidak ada pisang terdeteksi", (16, tinggi - 26),
@@ -190,6 +233,9 @@ class ProsesorVideo:
         label = NAMA_KELAS.get(kategori_stabil, kategori_stabil)
         warna = WARNA_BGR.get(kategori_stabil, (200, 200, 200))
 
+        x, y, w, h = kotak
+        cv2.rectangle(gambar, (x, y), (x + w, y + h), warna, 2)
+
         cv2.rectangle(gambar, (0, tinggi - 70), (420, tinggi), (25, 25, 25), -1)
         cv2.putText(gambar, label, (16, tinggi - 38),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.95, warna, 2, cv2.LINE_AA)
@@ -204,30 +250,19 @@ class ProsesorVideo:
         return av.VideoFrame.from_ndarray(gambar, format="bgr24")
 
 
-def tampilkan_panel_referensi(database):
+def tampilkan_panel_referensi():
     st.markdown("<div class='kartu'>", unsafe_allow_html=True)
     st.markdown("<h4>Referensi tingkat kematangan</h4>", unsafe_allow_html=True)
 
-    if database is None:
-        st.write("File database_pisang.csv tidak ditemukan.")
-    else:
-        peta_warna_hex = {
-            "Mentah": "#569c4a",
-            "Mengkal": "#a3b845",
-            "Matang": "#f4ad44",
-            "Sangat Matang": "#ec7d2c",
-            "Terlalu Matang/Busuk": "#c83c3c",
-        }
-        for _, baris in database.iterrows():
-            warna_hex = peta_warna_hex.get(baris["nama_indonesia"], "#999")
-            st.markdown(
-                f"<div class='baris-referensi'>"
-                f"<span><span class='titik' style='background:{warna_hex}'></span>"
-                f"{baris['nama_indonesia']}</span>"
-                f"<span style='color:#8a8a8a'>{baris['warna_dominan']}</span>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
+    for item in REFERENSI_KEMATANGAN:
+        st.markdown(
+            f"<div class='baris-referensi'>"
+            f"<span><span class='titik' style='background:{item['warna_hex']}'></span>"
+            f"{item['label']}</span>"
+            f"<span style='color:#8a8a8a; text-align:right; max-width:60%'>{item['deskripsi']}</span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -274,7 +309,6 @@ def main():
     )
 
     model = muat_model()
-    database = muat_database()
 
     if "antrian_hasil" not in st.session_state:
         st.session_state.antrian_hasil = queue.Queue(maxsize=1)
@@ -301,7 +335,7 @@ def main():
 
     with kolom_panel:
         tampilkan_panel_status(antrian_hasil, ctx.state.playing)
-        tampilkan_panel_referensi(database)
+        tampilkan_panel_referensi()
 
     st.markdown(
         "<div class='subjudul' style='margin-top:1.4rem'>"
