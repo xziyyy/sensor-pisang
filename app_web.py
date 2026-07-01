@@ -53,7 +53,31 @@ WARNA_BGR = {
 }
 
 RTC_CONFIGURATION = RTCConfiguration(
-    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+    {
+        "iceServers": [
+            {"urls": ["stun:stun.l.google.com:19302"]},
+            # TURN server gratis (Open Relay Project). Diperlukan karena
+            # jaringan Streamlit Community Cloud sering memblokir koneksi
+            # WebRTC langsung (STUN saja tidak cukup di sana). Layanan
+            # gratis ini kadang kurang stabil; kalau masih sering gagal,
+            # pertimbangkan pindah ke TURN berbayar seperti Twilio.
+            {
+                "urls": ["turn:openrelay.metered.ca:80"],
+                "username": "openrelayproject",
+                "credential": "openrelayproject",
+            },
+            {
+                "urls": ["turn:openrelay.metered.ca:443"],
+                "username": "openrelayproject",
+                "credential": "openrelayproject",
+            },
+            {
+                "urls": ["turn:openrelay.metered.ca:443?transport=tcp"],
+                "username": "openrelayproject",
+                "credential": "openrelayproject",
+            },
+        ]
+    }
 )
 
 
