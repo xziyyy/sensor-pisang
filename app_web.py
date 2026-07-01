@@ -32,11 +32,28 @@ import pandas as pd
 import streamlit as st
 from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
 
-from ekstraksi_ciri import ambil_ciri
+from ekstraksi_ciri import ambil_ciri, segmentasi_pisang
 
 FILE_MODEL = "model_pisang.pkl"
 FILE_DATABASE = "database_pisang.csv"
 JUMLAH_FRAME_SMOOTHING = 10
+UKURAN_ANALISIS = (200, 200)  # harus sama dengan resize di dalam ambil_ciri()
+
+
+def ada_objek_di_frame(gambar_bgr):
+    """
+    Pakai ulang segmentasi_pisang() dari ekstraksi_ciri.py untuk mengecek
+    apakah ada objek yang cukup besar tersegmentasi dari background.
+
+    segmentasi_pisang() mengembalikan mask putih PENUH (semua piksel 255)
+    kalau tidak ada kontur yang ditemukan, atau kontur yang ada terlalu
+    kecil (< 5% dari luas frame) -> itu tandanya "tidak ada objek layak".
+    Kalau ada objek yang tersegmentasi, mask-nya hanya mengisi area
+    kontur tersebut, bukan seluruh frame.
+    """
+    gambar_kecil = cv2.resize(gambar_bgr, UKURAN_ANALISIS)
+    mask = segmentasi_pisang(gambar_kecil)
+    return cv2.countNonZero(mask) < mask.size
 
 NAMA_KELAS = {
     "mentah": "Mentah",
@@ -145,6 +162,18 @@ class ProsesorVideo:
 
     def recv(self, frame):
         gambar = frame.to_ndarray(format="bgr24")
+        tinggi = gambar.shape[0]
+
+        if not ada_objek_di_frame(gambar):
+            self.riwayat.clear()
+            cv2.rectangle(gambar, (0, tinggi - 70), (420, tinggi), (25, 25, 25), -1)
+            cv2.putText(gambar, "Tidak ada pisang terdeteksi", (16, tinggi - 26),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (190, 190, 190), 2, cv2.LINE_AA)
+            try:
+                self.antrian_hasil.put_nowait((None, 0.0))
+            except queue.Full:
+                pass
+            return av.VideoFrame.from_ndarray(gambar, format="bgr24")
 
         try:
             ciri = ambil_ciri(gambar).reshape(1, -1)
@@ -161,7 +190,6 @@ class ProsesorVideo:
         label = NAMA_KELAS.get(kategori_stabil, kategori_stabil)
         warna = WARNA_BGR.get(kategori_stabil, (200, 200, 200))
 
-        tinggi = gambar.shape[0]
         cv2.rectangle(gambar, (0, tinggi - 70), (420, tinggi), (25, 25, 25), -1)
         cv2.putText(gambar, label, (16, tinggi - 38),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.95, warna, 2, cv2.LINE_AA)
@@ -225,8 +253,11 @@ def tampilkan_panel_status(antrian_hasil, sedang_jalan):
         tempat_status.write("Menunggu data dari kamera...")
     else:
         kategori, keyakinan = hasil_terakhir
-        label = NAMA_KELAS.get(kategori, kategori)
-        tempat_status.markdown(f"**{label}**  \nkeyakinan {keyakinan:.0%}")
+        if kategori is None:
+            tempat_status.write("Tidak ada pisang terdeteksi di kamera.")
+        else:
+            label = NAMA_KELAS.get(kategori, kategori)
+            tempat_status.markdown(f"**{label}**  \nkeyakinan {keyakinan:.0%}")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
