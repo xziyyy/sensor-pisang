@@ -1,6 +1,7 @@
-tensorflow
-opencv-python
+streamlit
+opencv-python-headless
+joblib
+scikit-learn
+scikit-image
 numpy
-kivy
-kivymd
-tflite-runtime
+pandas
