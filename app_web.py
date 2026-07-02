@@ -42,7 +42,7 @@ NAMA_KELAS = {
     "mentah": "Mentah",
     "mateng": "Matang",
     "kematengan": "Sangat Matang",
-    "busuk": "Terlalu Matang",
+    "busuk": "busuk",
 }
 
 WARNA_BGR = {
@@ -77,7 +77,7 @@ REFERENSI_KEMATANGAN = [
     },
     {
         "kelas": "busuk",
-        "label": "Terlalu Matang",
+        "label": "busuk",
         "deskripsi": "Bintik coklat meluas atau kulit sudah menghitam",
         "warna_hex": "#c83c3c",
     },
