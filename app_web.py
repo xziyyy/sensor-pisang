@@ -233,17 +233,20 @@ class ProsesorVideo:
     ke browser. Dipakai khusus untuk mode Realtime.
     """
 
-    def __init__(self, model, antrian_hasil):
+    def __init__(self, model, antrian_hasil, balik_gambar):
         self.model = model
         self.antrian_hasil = antrian_hasil
+        self.balik_gambar = balik_gambar
         self.riwayat = collections.deque(maxlen=JUMLAH_FRAME_SMOOTHING)
 
     def recv(self, frame):
         gambar = frame.to_ndarray(format="bgr24")
-        # Kamera depan/laptop biasanya dikirim browser dalam kondisi
-        # "kaca cermin" (kanan-kiri terbalik) untuk preview normal.
-        # Dibalik lagi di sini supaya arah di layar sesuai arah asli.
-        gambar = cv2.flip(gambar, 1)
+        if self.balik_gambar:
+            # Kamera depan biasanya dikirim browser dalam kondisi "kaca
+            # cermin" (kanan-kiri terbalik) untuk preview normal, jadi
+            # dibalik lagi di sini. Kamera belakang TIDAK di-mirror oleh
+            # browser, jadi tidak perlu (dan tidak boleh) dibalik.
+            gambar = cv2.flip(gambar, 1)
 
         ada_objek, kotak, kategori_frame, keyakinan = proses_frame(self.model, gambar)
 
@@ -315,10 +318,13 @@ def tampilkan_panel_status(antrian_hasil, sedang_jalan):
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-def mode_realtime(model):
+def mode_realtime(model, arah_kamera):
     if "antrian_hasil" not in st.session_state:
         st.session_state.antrian_hasil = queue.Queue(maxsize=1)
     antrian_hasil = st.session_state.antrian_hasil
+
+    balik_gambar = arah_kamera == "Depan"
+    facing_mode = "user" if arah_kamera == "Depan" else "environment"
 
     kolom_video, kolom_panel = st.columns([3, 2])
 
@@ -327,8 +333,13 @@ def mode_realtime(model):
             key="deteksi-pisang-realtime",
             mode=WebRtcMode.SENDRECV,
             rtc_configuration=RTC_CONFIGURATION,
-            video_processor_factory=lambda: ProsesorVideo(model, antrian_hasil),
-            media_stream_constraints={"video": True, "audio": False},
+            video_processor_factory=lambda: ProsesorVideo(
+                model, antrian_hasil, balik_gambar
+            ),
+            media_stream_constraints={
+                "video": {"facingMode": facing_mode},
+                "audio": False,
+            },
             async_processing=True,
         )
 
@@ -336,7 +347,8 @@ def mode_realtime(model):
         tampilkan_panel_status(antrian_hasil, ctx.state.playing)
 
 
-def mode_ambil_foto(model):
+def mode_ambil_foto(model, arah_kamera):
+    balik_gambar = arah_kamera == "Depan"
     kolom_foto, kolom_hasil = st.columns([3, 2])
 
     with kolom_foto:
@@ -352,7 +364,8 @@ def mode_ambil_foto(model):
             bytes_data = foto.getvalue()
             array_np = np.frombuffer(bytes_data, dtype=np.uint8)
             gambar = cv2.imdecode(array_np, cv2.IMREAD_COLOR)
-            gambar = cv2.flip(gambar, 1)
+            if balik_gambar:
+                gambar = cv2.flip(gambar, 1)
 
             with st.spinner("Menganalisis..."):
                 ada_objek, kotak, kategori, keyakinan = proses_frame(model, gambar)
@@ -375,11 +388,13 @@ def mode_ambil_foto(model):
 def panel_menu():
     """
     Menu tersembunyi di kanan atas (bentuk tombol kecil "Menu"), isinya
-    pilihan mode. Default-nya tertutup, tidak memenuhi layar seperti
-    selector besar yang selalu tampil.
+    pilihan mode dan arah kamera. Default-nya tertutup, tidak memenuhi
+    layar seperti selector besar yang selalu tampil.
     """
     if "mode_terpilih" not in st.session_state:
         st.session_state.mode_terpilih = "Realtime"
+    if "arah_kamera" not in st.session_state:
+        st.session_state.arah_kamera = "Depan"
 
     kolom_judul, kolom_menu = st.columns([5, 1])
     with kolom_judul:
@@ -391,6 +406,13 @@ def panel_menu():
                 options=["Realtime", "Ambil Foto"],
                 key="mode_terpilih",
             )
+            st.radio(
+                "Kamera",
+                options=["Depan", "Belakang"],
+                key="arah_kamera",
+                help="Kamera depan biasanya perlu dibalik (anti-mirror). "
+                     "Kamera belakang tidak perlu dibalik.",
+            )
 
 
 def main():
@@ -401,6 +423,7 @@ def main():
 
     model = muat_model()
     mode = st.session_state.mode_terpilih
+    arah_kamera = st.session_state.arah_kamera
 
     if mode == "Realtime":
         st.markdown(
@@ -408,14 +431,14 @@ def main():
             "pembatas tampil langsung di video.</div>",
             unsafe_allow_html=True,
         )
-        mode_realtime(model)
+        mode_realtime(model, arah_kamera)
     else:
         st.markdown(
             "<div class='subjudul'>Ambil satu foto pisang, hasil analisis "
             "muncul setelah foto diambil.</div>",
             unsafe_allow_html=True,
         )
-        mode_ambil_foto(model)
+        mode_ambil_foto(model, arah_kamera)
 
     st.markdown("<div style='margin-top:1.2rem'></div>", unsafe_allow_html=True)
     tampilkan_panel_referensi()
