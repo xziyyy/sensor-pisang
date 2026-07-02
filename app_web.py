@@ -1,5 +1,5 @@
 """
-Deteksi kematangan pisang lewat browser, dua mode:
+SmartFruit - deteksi kematangan pisang lewat browser, dua mode:
 - Realtime : kamera menyala terus, label update tiap frame.
 - Ambil Foto: jepret satu kali, hasil dianalisis dari foto itu saja.
 
@@ -398,7 +398,7 @@ def panel_menu():
 
     kolom_judul, kolom_menu = st.columns([5, 1])
     with kolom_judul:
-        st.title("Deteksi Kematangan Pisang")
+        st.title("SmartFruit")
     with kolom_menu:
         with st.popover("Menu", use_container_width=True):
             st.radio(
@@ -416,7 +416,7 @@ def panel_menu():
 
 
 def main():
-    st.set_page_config(page_title="Deteksi Kematangan Pisang", layout="centered")
+    st.set_page_config(page_title="SmartFruit", layout="centered")
     suntik_gaya()
 
     panel_menu()
