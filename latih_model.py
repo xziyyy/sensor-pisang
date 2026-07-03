@@ -49,7 +49,7 @@ def main():
     nilai, jumlah_tiap = np.unique(y, return_counts=True)
     for k, j in zip(nilai, jumlah_tiap):
         if j < 15:
-            print(f"Kategori '{k}' hanya punya {j} gambar. "
+            print(f"⚠️  Kategori '{k}' hanya punya {j} gambar. "
                   f"Idealnya minimal 30-50 gambar per kategori, beragam "
                   f"pencahayaan & background, supaya model tidak overfit.")
 

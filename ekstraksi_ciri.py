@@ -1,48 +1,13 @@
-"""
-Modul ekstraksi ciri (feature extraction) untuk deteksi kematangan pisang.
-
-Alur:
-1. Segmentasi objek pisang dari background sebelum menghitung ciri, lewat
-   tiga tahap penyaringan:
-     a. Saturasi tinggi (Otsu) - objek lebih jenuh warnanya dari background.
-     b. Rentang warna khas pisang (hijau-kuning) + bercak gelap/coklat -
-        kulit tangan/wajah manusia umumnya di luar rentang ini.
-     c. Bentuk memanjang (lonjong) - pisang berbentuk panjang, bukan
-        bulat/kompak seperti tangan mengepal atau wajah.
-2. Ciri warna: rata-rata & std HSV, histogram Hue (menangkap campuran
-   warna kuning+coklat), dan rasio bercak gelap/coklat (indikator tingkat
-   kematangan & pembusukan).
-3. Ciri tekstur (GLCM) untuk membedakan kulit licin (mentah) vs kulit
-   berbintik (mateng/busuk).
-
-PENTING: kalau logika di file ini diubah, model_pisang.pkl harus dilatih
-ulang (jalankan latih_model.py lagi), karena ciri hasil segmentasi lama
-tidak lagi cocok dengan model yang sudah tersimpan.
-"""
-
 import cv2
 import numpy as np
 from skimage.feature import graycomatrix, graycoprops
 
-# Rentang warna khas pisang dalam HSV (H: 0-179 di OpenCV). Mencakup
-# hijau (mentah) sampai kuning (matang). Nilai ini heuristik/perkiraan -
-# kalau di uji coba nyata pisang asli malah sering ditolak, coba lebarkan
-# rentangnya; kalau tangan/benda lain masih sering lolos, coba persempit.
 BATAS_WARNA_PISANG_BAWAH = (15, 35, 30)
 BATAS_WARNA_PISANG_ATAS = (95, 255, 255)
 
-# Bercak coklat/hitam pada pisang sangat matang/busuk seringkali value-nya
-# rendah (gelap) dan tidak selalu masuk rentang warna di atas, jadi
-# ditambahkan sebagai jalur terpisah supaya tetap terhitung sebagai bagian
-# dari pisang, bukan dibuang sebagai "background".
 BATAS_BERCAK_GELAP_BAWAH = (0, 0, 0)
 BATAS_BERCAK_GELAP_ATAS = (179, 130, 95)
 
-# Rasio panjang:lebar minimum (dari minAreaRect) supaya kontur dianggap
-# berbentuk pisang (lonjong), bukan objek bulat/kompak seperti tangan atau
-# wajah. Naikkan kalau masih banyak salah deteksi objek bulat; turunkan
-# kalau pisang asli malah sering ditolak (misal pisang difoto dari ujung,
-# atau tumpukan pisang yang bentuknya lebih kompak).
 AMBANG_RASIO_MEMANJANG = 1.4
 
 
@@ -97,11 +62,6 @@ def _ciri_warna(hsv, mask):
 
 
 def _ciri_bercak(hsv, mask):
-    """
-    Rasio piksel 'gelap/coklat' (bercak kematangan/busuk) terhadap
-    total piksel objek. Pisang yang makin matang/busuk biasanya makin
-    banyak bercak coklat-kehitaman pada kulitnya.
-    """
     v_channel = hsv[:, :, 2]
     area_objek = max(cv2.countNonZero(mask), 1)
 
@@ -113,7 +73,6 @@ def _ciri_bercak(hsv, mask):
 
 
 def _ciri_tekstur(gambar_bgr, mask):
-    """Ciri tekstur GLCM pada area objek saja (kulit licin vs berbintik)."""
     abu = cv2.cvtColor(gambar_bgr, cv2.COLOR_BGR2GRAY)
     abu_masked = cv2.bitwise_and(abu, abu, mask=mask)
     abu_kecil = cv2.resize(abu_masked, (64, 64))
@@ -128,7 +87,6 @@ def _ciri_tekstur(gambar_bgr, mask):
 
 
 def ambil_ciri(gambar_bgr):
-    """Ekstrak satu vektor ciri lengkap dari satu gambar pisang."""
     gambar_bgr = cv2.resize(gambar_bgr, (200, 200))
     mask = segmentasi_pisang(gambar_bgr)
     hsv = cv2.cvtColor(gambar_bgr, cv2.COLOR_BGR2HSV)

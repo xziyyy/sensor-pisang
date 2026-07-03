@@ -1,16 +1,3 @@
-"""
-Deteksi kematangan pisang lewat kamera, memakai model yang sudah dilatih
-oleh latih_model.py (model_pisang.pkl).
-
-Label distabilkan dengan voting mayoritas dari N prediksi terakhir
-(supaya tidak "kedip-kedip" ganti label tiap frame karena noise), dan
-tingkat keyakinan (confidence) model ditampilkan di layar.
-
-Cara pakai:
-    python deteksi_kamera.py
-(Jalankan latih_model.py dulu untuk membuat model_pisang.pkl)
-"""
-
 import collections
 import cv2
 import joblib

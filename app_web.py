@@ -1,20 +1,3 @@
-"""
-SmartFruit - deteksi kematangan pisang lewat browser, dua mode:
-- Realtime : kamera menyala terus, label update tiap frame.
-- Ambil Foto: jepret satu kali, hasil dianalisis dari foto itu saja.
-
-Mode dan arah kamera dipilih lewat menu (tombol "Menu" di kanan atas).
-Di kedua mode: video/foto dibalik (cv2.flip) supaya tidak mirror/kaca,
-kotak pembatas digambar di sekeliling pisang yang terdeteksi, klasifikasi
-hanya jalan kalau ada objek yang tersegmentasi dari background (lihat
-deteksi_area_pisang()), dan panel referensi tingkat kematangan (skala
-Von Loesecke) selalu tampil di bawah.
-
-Cara coba lokal:
-    pip install -r requirements.txt
-    streamlit run app_web.py
-"""
-
 import collections
 import queue
 import time
@@ -30,7 +13,7 @@ from ekstraksi_ciri import ambil_ciri, segmentasi_pisang
 
 FILE_MODEL = "model_pisang.pkl"
 JUMLAH_FRAME_SMOOTHING = 10
-UKURAN_ANALISIS = (200, 200)  # harus sama dengan resize di dalam ambil_ciri()
+UKURAN_ANALISIS = (200, 200)
 
 NAMA_KELAS = {
     "mentah": "Mentah",
@@ -46,10 +29,6 @@ WARNA_BGR = {
     "busuk": (60, 60, 200),
 }
 
-# Referensi tingkat kematangan, dipetakan dari skala Von Loesecke - skala
-# 7 tahap warna kulit pisang yang jadi rujukan umum di riset & industri
-# pisang sejak 1949, dan masih dipakai sampai sekarang untuk penyortiran
-# pisang secara visual. Dipetakan ke 4 kategori yang dipakai model ini.
 REFERENSI_KEMATANGAN = [
     {
         "kelas": "mentah",
@@ -81,9 +60,6 @@ RTC_CONFIGURATION = RTCConfiguration(
     {
         "iceServers": [
             {"urls": ["stun:stun.l.google.com:19302"]},
-            # TURN server gratis (Open Relay Project). Diperlukan karena
-            # jaringan Streamlit Community Cloud sering memblokir koneksi
-            # WebRTC langsung (STUN saja tidak cukup di sana).
             {
                 "urls": ["turn:openrelay.metered.ca:80"],
                 "username": "openrelayproject",
@@ -151,14 +127,6 @@ def muat_model():
 
 
 def deteksi_area_pisang(gambar_bgr):
-    """
-    Pakai ulang segmentasi_pisang() dari ekstraksi_ciri.py untuk mengecek
-    apakah ada objek yang cukup besar tersegmentasi dari background, dan
-    sekaligus menghitung kotak pembatas (bounding box) di sekelilingnya.
-
-    Mengembalikan (ada_objek, kotak) dengan kotak berupa (x, y, w, h)
-    dalam koordinat frame ASLI, atau None kalau tidak ada objek.
-    """
     tinggi_asli, lebar_asli = gambar_bgr.shape[:2]
     gambar_kecil = cv2.resize(gambar_bgr, UKURAN_ANALISIS)
     mask = segmentasi_pisang(gambar_kecil)
@@ -174,12 +142,6 @@ def deteksi_area_pisang(gambar_bgr):
 
 
 def proses_frame(model, gambar_bgr):
-    """
-    Satu langkah klasifikasi untuk satu gambar (dipakai di kedua mode).
-    Mengembalikan (ada_objek, kotak, kategori, keyakinan).
-    Tidak ada smoothing di sini -- smoothing khusus dipakai di mode
-    realtime saja (lihat ProsesorVideo).
-    """
     ada_objek, kotak = deteksi_area_pisang(gambar_bgr)
     if not ada_objek:
         return False, None, None, 0.0
@@ -220,12 +182,6 @@ def gambar_status_kosong(gambar_bgr, teks="Tidak ada pisang terdeteksi"):
 
 
 class ProsesorVideo:
-    """
-    Jalan di thread terpisah milik streamlit-webrtc. Tiap frame video masuk
-    lewat recv(), diproses pakai model yang sudah dilatih, lalu label +
-    kotak pembatas digambar langsung di atas frame sebelum dikirim balik
-    ke browser. Dipakai khusus untuk mode Realtime.
-    """
 
     def __init__(self, model, antrian_hasil, balik_gambar):
         self.model = model
@@ -236,10 +192,6 @@ class ProsesorVideo:
     def recv(self, frame):
         gambar = frame.to_ndarray(format="bgr24")
         if self.balik_gambar:
-            # Kamera depan biasanya dikirim browser dalam kondisi "kaca
-            # cermin" (kanan-kiri terbalik) untuk preview normal, jadi
-            # dibalik lagi di sini. Kamera belakang TIDAK di-mirror oleh
-            # browser, jadi tidak perlu (dan tidak boleh) dibalik.
             gambar = cv2.flip(gambar, 1)
 
         ada_objek, kotak, kategori_frame, keyakinan = proses_frame(self.model, gambar)
@@ -380,7 +332,6 @@ def mode_ambil_foto(model, arah_kamera):
 
 
 def panel_menu():
-    """Menu tersembunyi di kanan atas, berisi pilihan mode dan arah kamera."""
     if "mode_terpilih" not in st.session_state:
         st.session_state.mode_terpilih = "Realtime"
     if "arah_kamera" not in st.session_state:
