@@ -1,22 +1,3 @@
-"""
-Latih & evaluasi model klasifikasi kematangan pisang.
-
-Fitur dinormalisasi (StandardScaler) sebelum masuk KNN, nilai n_neighbors
-dicari otomatis lewat cross-validation (GridSearchCV), dan data dibagi
-train/test (80/20) supaya akurasi yang dilaporkan dihitung dari data yang
-tidak dipakai untuk belajar. Model + scaler disimpan ke model_pisang.pkl.
-
-Cara pakai:
-    python latih_model.py
-
-Struktur folder dataset yang diharapkan:
-    train/
-        busuk/      *.jpg
-        mentah/     *.jpg
-        mateng/     *.jpg
-        kematengan/ *.jpg
-"""
-
 import os
 import numpy as np
 import cv2
@@ -68,7 +49,7 @@ def main():
     nilai, jumlah_tiap = np.unique(y, return_counts=True)
     for k, j in zip(nilai, jumlah_tiap):
         if j < 15:
-            print(f"⚠️  Kategori '{k}' hanya punya {j} gambar. "
+            print(f"Kategori '{k}' hanya punya {j} gambar. "
                   f"Idealnya minimal 30-50 gambar per kategori, beragam "
                   f"pencahayaan & background, supaya model tidak overfit.")
 
