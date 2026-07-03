@@ -1,25 +1,23 @@
 """
 Modul ekstraksi ciri (feature extraction) untuk deteksi kematangan pisang.
 
-Strategi peningkatan akurasi dibanding versi awal:
-1. Segmentasi: pisahkan objek pisang dari background sebelum hitung ciri,
-   supaya warna meja/tangan/dinding di belakang tidak ikut "dianggap" warna pisang.
-   Tiga tahap penyaringan dipakai supaya tidak asal ambil objek berwarna:
+Alur:
+1. Segmentasi objek pisang dari background sebelum menghitung ciri, lewat
+   tiga tahap penyaringan:
      a. Saturasi tinggi (Otsu) - objek lebih jenuh warnanya dari background.
      b. Rentang warna khas pisang (hijau-kuning) + bercak gelap/coklat -
         kulit tangan/wajah manusia umumnya di luar rentang ini.
      c. Bentuk memanjang (lonjong) - pisang berbentuk panjang, bukan
         bulat/kompak seperti tangan mengepal atau wajah.
-2. Ciri lebih kaya: bukan cuma rata-rata & std HSV, tapi juga histogram Hue
-   (menangkap campuran warna kuning+coklat) dan rasio bercak gelap/coklat
-   (indikator kuat tingkat kematangan & pembusukan).
+2. Ciri warna: rata-rata & std HSV, histogram Hue (menangkap campuran
+   warna kuning+coklat), dan rasio bercak gelap/coklat (indikator tingkat
+   kematangan & pembusukan).
 3. Ciri tekstur (GLCM) untuk membedakan kulit licin (mentah) vs kulit
    berbintik (mateng/busuk).
 
-PENTING: kalau file ini diubah, model_pisang.pkl HARUS dilatih ulang
-(jalankan latih_model.py lagi). Model lama dilatih dari ciri hasil
-segmentasi versi sebelumnya, jadi tidak lagi cocok/akurat dipakai
-bersama versi segmentasi yang baru.
+PENTING: kalau logika di file ini diubah, model_pisang.pkl harus dilatih
+ulang (jalankan latih_model.py lagi), karena ciri hasil segmentasi lama
+tidak lagi cocok dengan model yang sudah tersimpan.
 """
 
 import cv2

@@ -1,24 +1,14 @@
 """
 Latih & evaluasi model klasifikasi kematangan pisang.
 
-Perbaikan dibanding versi awal:
-- Path dataset diperbaiki (versi awal ada karakter sampah "       ;;;;;;;;;;;;;p"
-  di tengah path -> os.listdir/cv2.imread tidak akan pernah ketemu file,
-  jadi model lama sebenarnya hampir tidak pernah benar-benar dilatih
-  dengan data sungguhan).
-- Fitur dinormalisasi (StandardScaler) sebelum masuk KNN. KNN sangat
-  sensitif terhadap skala: tanpa normalisasi, channel dengan angka besar
-  (misalnya nilai 0-255) akan mendominasi jarak, sementara fitur penting
-  seperti rasio bercak (skala 0-1) jadi diabaikan.
-- n_neighbors dicari otomatis lewat cross-validation (GridSearchCV),
-  bukan ditebak n_neighbors=5.
-- Data dibagi train/test (80/20) supaya akurasi yang dilaporkan jujur -
-  dihitung dari data yang TIDAK dipakai untuk belajar.
-- Model + scaler disimpan ke model_pisang.pkl, supaya skrip deteksi
-  kamera tidak perlu re-train ulang setiap kali dijalankan.
+Fitur dinormalisasi (StandardScaler) sebelum masuk KNN, nilai n_neighbors
+dicari otomatis lewat cross-validation (GridSearchCV), dan data dibagi
+train/test (80/20) supaya akurasi yang dilaporkan dihitung dari data yang
+tidak dipakai untuk belajar. Model + scaler disimpan ke model_pisang.pkl.
 
 Cara pakai:
     python latih_model.py
+
 Struktur folder dataset yang diharapkan:
     train/
         busuk/      *.jpg

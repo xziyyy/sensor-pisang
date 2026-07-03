@@ -3,18 +3,12 @@ SmartFruit - deteksi kematangan pisang lewat browser, dua mode:
 - Realtime : kamera menyala terus, label update tiap frame.
 - Ambil Foto: jepret satu kali, hasil dianalisis dari foto itu saja.
 
-Mode dipilih lewat menu (tombol "Menu" di kanan atas, membuka panel kecil
-berisi pilihan mode) -- bukan selector besar yang selalu tampil di layar.
-
-Fitur lain yang sudah ada sebelumnya, dipakai di kedua mode:
-- Video/foto dibalik (cv2.flip) supaya tidak mirror/kaca.
-- Kotak pembatas digambar di sekeliling pisang yang terdeteksi.
-- Klasifikasi hanya jalan kalau ada objek yang tersegmentasi dari
-  background (lihat deteksi_area_pisang()).
-- Panel referensi tingkat kematangan (skala Von Loesecke) selalu tampil
-  di bawah, di kedua mode.
-
-Model (model_pisang.pkl) dan ekstraksi_ciri.py tidak diubah sama sekali.
+Mode dan arah kamera dipilih lewat menu (tombol "Menu" di kanan atas).
+Di kedua mode: video/foto dibalik (cv2.flip) supaya tidak mirror/kaca,
+kotak pembatas digambar di sekeliling pisang yang terdeteksi, klasifikasi
+hanya jalan kalau ada objek yang tersegmentasi dari background (lihat
+deteksi_area_pisang()), dan panel referensi tingkat kematangan (skala
+Von Loesecke) selalu tampil di bawah.
 
 Cara coba lokal:
     pip install -r requirements.txt
@@ -386,11 +380,7 @@ def mode_ambil_foto(model, arah_kamera):
 
 
 def panel_menu():
-    """
-    Menu tersembunyi di kanan atas (bentuk tombol kecil "Menu"), isinya
-    pilihan mode dan arah kamera. Default-nya tertutup, tidak memenuhi
-    layar seperti selector besar yang selalu tampil.
-    """
+    """Menu tersembunyi di kanan atas, berisi pilihan mode dan arah kamera."""
     if "mode_terpilih" not in st.session_state:
         st.session_state.mode_terpilih = "Realtime"
     if "arah_kamera" not in st.session_state:
